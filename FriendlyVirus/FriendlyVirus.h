@@ -2,4 +2,4 @@
 #include <Windows.h>
 void SendMessageToMailslot(LPWSTR lpContentTobeSent, DWORD dwBytesTobeWrite);
 WCHAR** GetMessageFromMailslot(HANDLE hMailslot);
-void FreePointers(WCHAR ** p);
+void FreePointers(LPWSTR **p);

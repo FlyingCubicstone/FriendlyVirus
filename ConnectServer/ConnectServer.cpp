@@ -8,6 +8,9 @@
 #pragma comment(lib,"ws2_32.lib")
 #pragma comment(lib,"../debug/FriendlyVirus.lib")
 
+//邮槽句柄指针
+HANDLE *hMailslot;
+
 void GetTotalBytes(WCHAR** des,int *totalBytes) {
 	*totalBytes = 0;
 	WCHAR** copyDes = des;
@@ -45,10 +48,17 @@ DWORD WINAPI ThreadProc(LPVOID lpParam) {
 	CHAR recvBuff[512];
 	int bytesRecv = 0;
 	int threadId = GetCurrentThreadId();
-	HANDLE* hMailslot=NULL;
+	WCHAR exeName[] = L"RemoteOperation.exe";
+	BOOL bCreateProcessResult = 0;
+	STARTUPINFO strtinfo;
+	PROCESS_INFORMATION processInformation;
+	WCHAR* totalMessage = NULL;
+	WCHAR* totalMessageTmp = NULL;
+	LPWSTR* message = NULL;
+	LPWSTR* messageTmp = NULL;
+	ZeroMemory(&strtinfo, sizeof(strtinfo));
+	ZeroMemory(&processInformation, sizeof(PROCESS_INFORMATION));
 	printf("线程[%d]已启动!\n", threadId);
-	//创建邮槽便于本程序与其创建的进程间的数据交换
-	hMailslot = CreateMyMailslot();
 	while (true)
 	{
 		printf("线程[%d]等待数据传入......\n",threadId);
@@ -62,47 +72,42 @@ DWORD WINAPI ThreadProc(LPVOID lpParam) {
 		else {
 			if (strcmp(recvBuff, "\\c") == 0 || strcmp(recvBuff, "\\close") == 0) {
 				printf("线程[%d]已结束\n",threadId);
+				//CloseHandle(hMailslot);
 				closesocket(answerSocket);
 				break;
 			}
 			printf("线程[%d]接收到数据:%s\n",threadId,recvBuff);
 			if (strcmp(recvBuff, "desktopfile") == 0) {
-				WCHAR exeName[] = L"RemoteOperation.exe";
-				BOOL bCreateProcessResult = 0;
-				STARTUPINFO strtinfo;
-				PROCESS_INFORMATION processInformation;
-				WCHAR* totalMessage = NULL;
-				WCHAR* totalMessageTmp = NULL;
-				ZeroMemory(&strtinfo, sizeof(strtinfo));
-				ZeroMemory(&processInformation, sizeof(PROCESS_INFORMATION));
 				bCreateProcessResult = CreateProcess(NULL,exeName, NULL, NULL, FALSE, 0, 
 					NULL, NULL, &strtinfo,&processInformation);
 				JudgeSuccessOrNot(bCreateProcessResult);
-				LPWSTR* message = GetMessageFromMailslot(*hMailslot);
-				LPWSTR* messageTmp = message;
-				while (*messageTmp) {
-					printf("%ws\n", *messageTmp);
-					message++;
-			}
-				/*if (*messageTmp) {
+				Sleep(500);
+				message = GetMessageFromMailslot(*hMailslot);
+				messageTmp = message;
+				if (*messageTmp) {
 					int totalBytes = 0;
 					GetTotalBytes(messageTmp, &totalBytes);
 					if (totalBytes != 0) {
-						totalMessage = (WCHAR*)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, totalBytes);
+						totalMessage = (WCHAR*)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, totalBytes+totalBytes/sizeof(WCHAR));
 						totalMessageTmp = totalMessage;
 					}
+					WCHAR slipChar = '\n';
 					while (*messageTmp) {
-						while (**message) {
-							CopyMemory((void*)*totalMessage, (void*)**messageTmp, sizeof(WCHAR));
+						while (**messageTmp) {
+							//CopyMemory((void*)*totalMessageTmp, (void**)**messageTmp, sizeof(WCHAR));
+							*totalMessageTmp = **messageTmp;
 							totalMessageTmp++;
-							**messageTmp++;
+							(*messageTmp)++;
 						}
+						*totalMessageTmp = slipChar;
+						totalMessageTmp++;
 						messageTmp++;
 					}
 				}
-				printf("%ws\n",totalMessage);
-				FreePointers(message);
-				HeapFree(GetProcessHeap(), HEAP_ZERO_MEMORY, totalMessage);*/
+				//发送数据回客户端
+				send(answerSocket, (char*)totalMessage, (lstrlen(totalMessage)+1)*sizeof(WCHAR),0);
+				HeapFree(GetProcessHeap(), HEAP_ZERO_MEMORY, message);
+				HeapFree(GetProcessHeap(), HEAP_ZERO_MEMORY, totalMessage);
 				CloseHandle(processInformation.hThread);
 				CloseHandle(processInformation.hProcess);
 			}
@@ -122,6 +127,8 @@ int main()
 	int nBindRet = 0;
 	int nListenRet = 0;
 	SOCKET listenSocket;
+	//创建邮槽便于本程序与其创建的进程间的数据交换
+	hMailslot = CreateMyMailslot();
 	nStartRet = WSAStartup(MAKEWORD(2, 2), &wSaData);
 	if (nStartRet != 0) {
 		printf("WSAStartup（）failed!error:%d\n", WSAGetLastError());
@@ -149,7 +156,7 @@ int main()
 		return -1;
 	}
 	printf("正在监听....\n");
-	nListenRet = listen(listenSocket, 10);
+	nListenRet = listen(listenSocket, 1);
 	if (nListenRet != 0) {
 		printf("监听失败!error:%d\n", WSAGetLastError());
 		return -1;

@@ -42,6 +42,7 @@ WCHAR** GetMessageFromMailslot(HANDLE hMailslot) {
 	while (dwMessageCount != 0) {
 		WCHAR *lpReadBuffer = (WCHAR*)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, dwNextSize);
 		if (!ReadFile(hMailslot, lpReadBuffer, dwNextSize, &dwBytesRead, NULL)) {
+			printf("ReadFile() failed!error:%d\n", GetLastError());
 			return NULL;
 		}
 		*readContentTmp = lpReadBuffer;
@@ -51,10 +52,11 @@ WCHAR** GetMessageFromMailslot(HANDLE hMailslot) {
 	return readContent;
 }
 
-void FreePointers(WCHAR ** p) {
-	while (*p) {
-		HeapFree(GetProcessHeap(), HEAP_ZERO_MEMORY, *p);
-		p++;
+void FreePointers(LPWSTR **p) {
+	LPWSTR **pTmp = p;
+	while (*pTmp) {
+		HeapFree(GetProcessHeap(), 0, **pTmp);
+		(*pTmp)++;
 	}
-	HeapFree(GetProcessHeap(), HEAP_ZERO_MEMORY, p);
+	HeapFree(GetProcessHeap(), HEAP_ZERO_MEMORY, *p);
 }

@@ -31,7 +31,7 @@ WCHAR** GetAllRunningProcess() {
 	}
 	do {
 		exeName = (WCHAR*)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(peCur.szExeFile));
-		CopyMemory(exeName, peCur.szExeFile, (lstrlen(peCur.szExeFile))*sizeof(WCHAR));
+		CopyMemory(exeName, peCur.szExeFile, (lstrlen(peCur.szExeFile)+1)*sizeof(WCHAR));
 		*petmp = exeName;
 		petmp++;
 	} while (Process32Next(hSnapshot, &peCur));
@@ -84,12 +84,14 @@ int main()
 		printf("%ws\n", strret.pOleStr);
 	}*/
 	WCHAR **content = NULL;
+	WCHAR **content_ = NULL;
 	content = GetAllRunningProcess();
+	content_ = content;
 	while (*content) {
 		//printf("%ws\n", *content);
-		SendMessageToMailslot(*content, lstrlen(*content) * sizeof(WCHAR));
+		SendMessageToMailslot(*content, (lstrlen(*content)+1) * sizeof(WCHAR));
 		content++;
 	}
-	//FreePointers(content);
+	FreePointers(&content_);
 	return 0;
 }
