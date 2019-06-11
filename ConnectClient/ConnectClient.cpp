@@ -58,7 +58,8 @@ int main(int argc,char* argv[])
 		while (true) {
 			printf("请输入你要发送的内容!\n");
 			ZeroMemory(&inputBuff, 512);
-			scanf_s("%s", inputBuff, 512);
+			scanf_s("%[^\n]", inputBuff, 512);
+			getchar();
 			bytesSent = send(clientSocket, inputBuff, strlen(inputBuff), 0);
 			if (bytesSent == SOCKET_ERROR) {
 				printf("发送失败!error:%d\n", WSAGetLastError());
@@ -68,18 +69,26 @@ int main(int argc,char* argv[])
 				printf("断开连接!\n");
 				break;
 			}
+			if (strcmp(inputBuff, "kill") == 0) {
+				ZeroMemory(&inputBuff, 512);
+				printf("请继续输入指令:");
+				scanf_s("%[^\n]", inputBuff, 512);
+				getchar();
+				send(clientSocket, inputBuff, strlen(inputBuff), 0);
+			}
 			printf("发送成功!\n");
-			if (strcmp(inputBuff, "desktopfile") == 0) {
-				//接收服务端发来的数据
-				Sleep(500);
-				bytesRecv = recv(clientSocket, recvBuff, 10240, 0);
-				if (bytesRecv == SOCKET_ERROR) {
-					printf("接收失败!error:%d\n", WSAGetLastError());
-				}
-				else {
-					printf("接收到来自服务端的信息:\n");
+		
+			//接收服务端发来的数据
+			Sleep(500);
+			bytesRecv = recv(clientSocket, recvBuff, 10240, 0);
+			if (bytesRecv == SOCKET_ERROR) {
+				printf("接收失败!error:%d\n", WSAGetLastError());
+			}
+			else {
+				printf("接收到来自服务端的信息:\n");
+				
 					printf("%ws\n", recvBuff);
-				}
+				
 			}
 			
 			

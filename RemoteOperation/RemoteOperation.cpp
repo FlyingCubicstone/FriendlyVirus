@@ -10,6 +10,19 @@
 
 #pragma comment(lib,"shell32.lib")
 #pragma comment(lib,"../debug/FriendlyVirus.lib")
+//公共函数，向邮槽发送信息
+VOID SendMyMessage(WCHAR**(*p)()) {
+	WCHAR **content = NULL;
+	WCHAR **content_ = NULL;
+	content = p();
+	content_ = content;
+	while (*content) {
+		SendMessageToMailslot(*content, (lstrlen(*content) + 1) * sizeof(WCHAR));
+		content++;
+	}
+	FreePointers(&content_);
+}
+
 
 //获取主机中所有正在运行的进程信息
 WCHAR** GetAllRunningProcess() {
@@ -45,6 +58,7 @@ VOID GetDustBinFolderInformation() {
 	LPITEMIDLIST lptmdlCurrent;
 	IShellFolder *lsfdBase=NULL;
 	IShellFolder *lsfdObj=NULL;
+	WCHAR *content = NULL;
 	DWORD dwFetched = 0;
 	SHGetDesktopFolder(&lsfdBase);
 	SHGetFolderLocation(nullptr, CSIDL_BITBUCKET, nullptr, 0,&lptmdl);
@@ -62,36 +76,60 @@ VOID GetDustBinFolderInformation() {
 	}
 }
 
-int main()
-{
-	/*LPITEMIDLIST lpitlst;
+//获取桌面上的所有文件
+WCHAR** GetFilesInDesktop() {
+	LPITEMIDLIST lpitlst;
 	LPITEMIDLIST lpitlstCurrent;
 	IShellFolder *isllfd;
 	LPENUMIDLIST lpEnum;
 	DWORD dwFetched;
-	SHGetFolderLocation(NULL, CSIDL_DESKTOP,NULL,0,&lpitlst);
+	SHGetFolderLocation(NULL, CSIDL_DESKTOP, NULL, 0, &lpitlst);
 	SHGetDesktopFolder(&isllfd);
 	STRRET strret;
+	WCHAR **content = NULL;
 	ZeroMemory(&strret, sizeof(strret));
-	isllfd->EnumObjects(nullptr, SHCONTF_NONFOLDERS | SHCONTF_FOLDERS | SHCONTF_INCLUDEHIDDEN,&lpEnum);
+	isllfd->EnumObjects(nullptr, SHCONTF_NONFOLDERS | SHCONTF_FOLDERS | SHCONTF_INCLUDEHIDDEN, &lpEnum);
+	content = (WCHAR**)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(WCHAR*)*100);
+	ZeroMemory(content, sizeof(WCHAR*) * 100);
+	WCHAR** tmp = content;
 	while (true)
 	{
 		if (lpEnum->Next(1, &lpitlstCurrent, &dwFetched) == S_FALSE) {
-			printf("目标文件夹没有内容了");
 			break;
 		}
 		isllfd->GetDisplayNameOf(lpitlstCurrent, SHGDN_NORMAL, &strret);
-		printf("%ws\n", strret.pOleStr);
-	}*/
-	WCHAR **content = NULL;
-	WCHAR **content_ = NULL;
-	content = GetAllRunningProcess();
-	content_ = content;
-	while (*content) {
-		//printf("%ws\n", *content);
-		SendMessageToMailslot(*content, (lstrlen(*content)+1) * sizeof(WCHAR));
-		content++;
+		WCHAR *name = (WCHAR*)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, (lstrlen(strret.pOleStr) + 1) * sizeof(WCHAR));
+		lstrcpy(name, strret.pOleStr);
+		*tmp = name;
+		(tmp)++;
+		
 	}
-	FreePointers(&content_);
+	return content;
+}
+
+int main(int argc,char *argv[])
+{
+	if (argc==3)
+	{
+		if (strcmp(argv[1], "kill") == 0) {
+
+		}
+		if (strcmp(argv[1], "") == 0) {
+
+		}
+	}
+	if (argc == 2) {
+		if (strcmp(argv[1], "desktopfile") == 0) {
+			SendMyMessage(GetFilesInDesktop);
+			
+		}
+		if (strcmp(argv[1], "processes") == 0) {
+			SendMyMessage(GetAllRunningProcess);
+		}
+	}
+	if (argc == 1) {
+		printf("本程序的功能有:\n");
+		printf("========\n========\n"); 
+	}
 	return 0;
 }

