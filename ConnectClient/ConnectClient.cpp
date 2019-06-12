@@ -2,22 +2,12 @@
 #include <iostream>
 #include<WS2tcpip.h>
 #include<WinSock2.h>
+#include"../FriendlyVirus/FriendlyVirus.h"
 
 #pragma comment(lib,"ws2_32.lib")
+#pragma comment(lib,"../debug/FriendlyVirus.lib")
 
-void CHARToWCHAR(WCHAR **des, const char* source) {
-	*des = (WCHAR*)malloc((strlen(source) + 1) * 2);
-	FillMemory(*des, (strlen(source) + 1) * 2, '\0');
-	WCHAR *desTmp = *des;
-	int size = strlen(source);
-	while (size>0) {
-		*desTmp = (WCHAR)*source;
-		desTmp++;
-		source++;
-		size--;
-	}
-}
-
+;
 int main(int argc,char* argv[])
 {
 	if (argc == 1) {
@@ -79,16 +69,15 @@ int main(int argc,char* argv[])
 			printf("发送成功!\n");
 		
 			//接收服务端发来的数据
-			Sleep(500);
-			bytesRecv = recv(clientSocket, recvBuff, 10240, 0);
+			ZeroMemory(recvBuff, 10240);
+			bytesRecv = recv(clientSocket,recvBuff, 10240, 0);
+			Sleep(1000);
 			if (bytesRecv == SOCKET_ERROR) {
 				printf("接收失败!error:%d\n", WSAGetLastError());
 			}
 			else {
-				printf("接收到来自服务端的信息:\n");
-				
-					printf("%ws\n", recvBuff);
-				
+				printf("共接收到%d字节数据\n", bytesRecv);
+				printf("接收到来自服务端的信息:\n%ws\n",recvBuff);
 			}
 			
 			

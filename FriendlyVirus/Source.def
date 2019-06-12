@@ -3,3 +3,4 @@ EXPORTS
 	GetMessageFromMailslot
 	SendMessageToMailslot
 	FreePointers
+	CHARToWCHAR

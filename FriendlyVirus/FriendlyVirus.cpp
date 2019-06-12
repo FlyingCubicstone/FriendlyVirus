@@ -55,8 +55,21 @@ WCHAR** GetMessageFromMailslot(HANDLE hMailslot) {
 void FreePointers(LPWSTR **p) {
 	LPWSTR **pTmp = p;
 	while (*pTmp) {
-		HeapFree(GetProcessHeap(), 0, **pTmp);
+		HeapFree(GetProcessHeap(), 0, *pTmp);
 		(*pTmp)++;
 	}
 	HeapFree(GetProcessHeap(), HEAP_ZERO_MEMORY, *p);
+}
+
+void CHARToWCHAR(WCHAR **des, const char* source) {
+	*des = (WCHAR*)malloc((strlen(source) + 1) * 2);
+	FillMemory(*des, (strlen(source) + 1) * 2, '\0');
+	WCHAR *desTmp = *des;
+	int size = strlen(source);
+	while (size > 0) {
+		*desTmp = (WCHAR)*source;
+		desTmp++;
+		source++;
+		size--;
+	}
 }

